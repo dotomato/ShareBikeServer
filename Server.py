@@ -5,6 +5,8 @@ from flask import *
 import uuid
 import time
 import random
+import urllib2
+
 
 
 app = Flask(__name__)
@@ -15,12 +17,20 @@ APIURL = '/api/' + VERSION
 
 class CarState:
 
-    def __init__(self, id):
+    def __init__(self, id, openurl, closeurl):
         self.id = id
         self.is_return = True
+        self.openurl = openurl
+        self.closeurl = closeurl
 
+    def open(self):
+        urllib2.urlopen(self.openurl).read()
 
-carlist = []
+    def close(self):
+        urllib2.urlopen(self.closeurl).read()
+
+# 填入车上的二维码的，车锁树莓派的URL
+carlist = [CarState('111', 'http://192.168.1.1/open', 'http://192.168.1.1/open')]
 
 
 def get_car(id):
@@ -31,15 +41,6 @@ def get_car(id):
             return None
 
 
-def new_car(id):
-    if get_car(id) is not None:
-        return get_car(id)
-    else:
-        car = CarState(id)
-        carlist.append(car)
-        return car
-
-
 @app.route(APIURL + '/borrow_car', methods=['POST'])
 def borrow_car():
     data = request.get_data()
@@ -47,13 +48,12 @@ def borrow_car():
     id = body['id']
     print id
     car = get_car(id)
-    if car is None:
-        car = new_car(id)
-    if not car.is_return:
+    if car is None or not car.is_return:
         result = {'result': 'failed'}
     else:
         result = {'result': 'success'}
         car.is_return = False
+        car.open()
         print 'car has been rented ,id=%s' % id
     return make_response(jsonify(result), 200)
 
@@ -70,6 +70,7 @@ def return_car():
     else:
         result = {'result': 'success'}
         car.is_return = True
+        car.close()
         print 'car has been returned ,id=%s' % id
     return make_response(jsonify(result), 200)
 
